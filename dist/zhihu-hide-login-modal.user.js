@@ -19,6 +19,7 @@
       if (modals.length === 0) return;
       modals.forEach((modal) => modal.remove());
       document.body.style.overflow = "";
+      document.documentElement.removeAttribute("style");
       console.log(`[zhihu-hide-login-modal] removed ${modals.length} modal(s)`);
     };
     removeLoginModal();
