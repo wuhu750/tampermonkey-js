@@ -45,6 +45,10 @@ interface DoubaoWordbookEntry {
   音标: string;
   常见搭配: string;
   例句: string;
+  /** 单词所在元素的 XPath（用于后续跳转到原文位置） */
+  wordXPath?: string;
+  /** 单词在 textNode 中的字符偏移（与 wordXPath 配合使用） */
+  wordTextOffset?: number;
 }
 
 /** v1 旧格式（导入迁移用） */
@@ -812,7 +816,7 @@ function openWordbookPreviewModal() {
     table.style.cssText = ui.table;
     const thead = document.createElement("thead");
     const hr = document.createElement("tr");
-    const heads = ["#", "来源", "单词", "发音", "翻译", "解释", "词性", "音标", "常见搭配", "例句", "保存时间"];
+    const heads = ["#", "来源", "单词", "发音", "翻译", "解释", "词性", "音标", "常见搭配", "例句", "保存时间", "操作"];
     for (const h of heads) {
       const th = document.createElement("th");
       th.scope = "col";
@@ -852,6 +856,7 @@ function openWordbookPreviewModal() {
         e.常见搭配,
         e.例句,
         formatSavedAtLocal(e.savedAt),
+        "", // 操作列占位
       ];
       cells.forEach((raw, colIdx) => {
         const td = document.createElement("td");
@@ -873,6 +878,21 @@ function openWordbookPreviewModal() {
             td.appendChild(sub);
           } else {
             td.textContent = "—";
+          }
+          tr.appendChild(td);
+          return;
+        }
+        if (colIdx === 11) {
+          // 操作列：跳转到原文
+          td.style.cssText = `padding:8px 10px;border:1px solid ${pal.cellBorder};vertical-align:top;`;
+          if (e.pageUrl) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.textContent = "跳转";
+            btn.style.cssText = `cursor:pointer;padding:4px 8px;border-radius:6px;border:1px solid ${ui.dark ? "#4b5563" : "#d1d5db"};background:${ui.dark ? "#1f2937" : "#f9fafb"};color:${ui.dark ? "#e5e7eb" : "#111827"};font:inherit;`;
+            btn.title = e.wordXPath ? "跳转到原文并滚动到单词位置" : "跳转到原文页面";
+            btn.addEventListener("click", () => navigateToEntryPosition(e));
+            td.appendChild(btn);
           }
           tr.appendChild(td);
           return;
@@ -1160,6 +1180,7 @@ function saveEntryFromAnchor(anchor: Element) {
   const wordHint = extractWordFromPanel(done);
   const fields = parseDoubaoTranslation(done, wordHint);
   const store = loadStore();
+  const pos = captureWordPosition();
   const entry: DoubaoWordbookEntry = {
     id: randomId(),
     savedAt: new Date().toISOString(),
@@ -1167,6 +1188,7 @@ function saveEntryFromAnchor(anchor: Element) {
     pageTitle: document.title,
     source: "doubao",
     ...fields,
+    ...(pos && { wordXPath: pos.xpath, wordTextOffset: pos.offset }),
   };
   store.entries.unshift(entry);
   saveStore(store);
@@ -1247,7 +1269,12 @@ function siphonEntryContentFingerprint(fields: Pick<DoubaoWordbookEntry, "单词
   return `${normalizeWordKey(fields.单词)}|${fields.词性.trim().slice(0, 200)}|${fields.解释.trim().slice(0, 500)}`;
 }
 
-function saveSiphonEntryCore(fields: SiphonParsedFields, toastMsg?: string, silentOnDup?: boolean) {
+function saveSiphonEntryCore(
+  fields: SiphonParsedFields,
+  toastMsg?: string,
+  silentOnDup?: boolean,
+  position?: { xpath: string; offset: number } | null
+) {
   const store = loadStore();
   const entry: DoubaoWordbookEntry = {
     id: randomId(),
@@ -1256,6 +1283,7 @@ function saveSiphonEntryCore(fields: SiphonParsedFields, toastMsg?: string, sile
     pageTitle: document.title,
     source: "siphon",
     ...fields,
+    ...(position && { wordXPath: position.xpath, wordTextOffset: position.offset }),
   };
   const fp = siphonEntryContentFingerprint(entry);
   if (store.entries.some((e) => e.source === "siphon" && siphonEntryContentFingerprint(e) === fp)) {
@@ -1269,7 +1297,7 @@ function saveSiphonEntryCore(fields: SiphonParsedFields, toastMsg?: string, sile
 }
 
 /** 划词按钮：优先合并当前页 Siphon 弹层解析结果 */
-function saveEntryFromSiphonSelection(word: string) {
+function saveEntryFromSiphonSelection(word: string, savedRange?: Range | null) {
   const w = word.trim();
   if (!w) return;
   const parsed = parseSiphonExtensionPopover(document);
@@ -1297,12 +1325,21 @@ function saveEntryFromSiphonSelection(word: string) {
       例句: "",
     };
   }
-  saveSiphonEntryCore(fields, `已加入生词本（siphon）：${fields.单词}`);
+  // 记录手动保存时间，防止 2 秒内的自动捕获重复保存
+  siphonLastManualSaveTime = Date.now();
+  const pos = captureWordPosition(savedRange);
+  saveSiphonEntryCore(fields, `已加入生词本（siphon）：${fields.单词}`, false, pos);
 }
 
 let siphonPopoverObserveTimer = 0;
+/** 最近一次手动保存的时间戳（毫秒），用于防止自动捕获重复保存） */
+let siphonLastManualSaveTime = 0;
 
 function tryAutoCaptureSiphonPopover() {
+  // 如果最近 2 秒内手动保存过，跳过自动捕获
+  if (Date.now() - siphonLastManualSaveTime < 2000) {
+    return;
+  }
   const parsed = parseSiphonExtensionPopover(document);
   if (!parsed || !parsed.解释.trim()) return;
   saveSiphonEntryCore(parsed, `已从 Siphon 同步：${parsed.单词}`, true);
@@ -1714,7 +1751,7 @@ function showSiphonSelectionToolbar(rect: DOMRect) {
     hideSiphonSelectionToolbar();
     siphonPendingRange = null;
     if (text) {
-      saveEntryFromSiphonSelection(text);
+      saveEntryFromSiphonSelection(text, saved);
     }
     try {
       applyRangeToPageSelection(saved, "button-click");
@@ -1914,6 +1951,193 @@ function initSelectionSiphonToolbar() {
       siphonPendingRange = null;
     }
   });
+}
+
+/** ---------- 单词位置记录与跳转 ---------- */
+
+/**
+ * 为指定文本节点生成 XPath。
+ * 返回形如 /html[1]/body[1]/div[2]/p[3]/text()[1] 的路径。
+ */
+function getXPathForTextNode(textNode: Text): string {
+  const parts: string[] = [];
+  let current: Node | null = textNode;
+  while (current && current.nodeType === Node.TEXT_NODE) {
+    const parent = current.parentElement as Element | null;
+    if (!parent) break;
+    const siblings = Array.from(parent.childNodes).filter(
+      (n: Node) => n.nodeType === Node.TEXT_NODE || n.nodeType === Node.ELEMENT_NODE
+    );
+    const index = (siblings as (Node | Text)[]).indexOf(current) + 1;
+    const tag = parent.tagName.toLowerCase();
+    parts.unshift(`${tag}[${index}]`);
+    current = parent;
+  }
+  // 追加 text() 索引
+  if (current && current.nodeType === Node.ELEMENT_NODE) {
+    const elem = current as Element;
+    const siblings = Array.from(elem.childNodes).filter((n: Node) => n.nodeType === Node.TEXT_NODE);
+    const idx = (siblings as (Node | Text)[]).indexOf(textNode) + 1;
+    parts.push(`text()[${idx}]`);
+  }
+  return "/" + parts.join("/");
+}
+
+/**
+ * 根据 XPath（支持 text()[n] 形式）查找对应文本节点。
+ */
+function findTextNodeByXPath(xpath: string, doc: Document): Text | null {
+  try {
+    const result = doc.evaluate(
+      xpath,
+      doc,
+      null,
+      XPathResult.FIRST_ORDERED_NODE_TYPE,
+      null
+    );
+    const node = result.singleNodeValue;
+    if (node instanceof Text) return node;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 在页面上查找单词出现的位置并滚动到该处。
+ * @param word 要查找的单词
+ * @param offset 字符偏移
+ * @param doc 目标文档，默认为当前文档
+ * @returns 是否成功定位
+ */
+function scrollToWordPosition(word: string, offset: number, doc: Document = document): boolean {
+  if (!word || !doc.body) return false;
+
+  const iterator = doc.createTreeWalker(
+    doc.body,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode: (node: Node) => {
+        const text = node.textContent ?? "";
+        const idx = text.toLowerCase().indexOf(word.toLowerCase());
+        return idx >= 0 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      },
+    }
+  );
+
+  let node: Text | null = null;
+  let currentOffset = 0;
+  while ((node = iterator.nextNode() as Text | null)) {
+    const text = node.textContent ?? "";
+    const idx = text.toLowerCase().indexOf(word.toLowerCase());
+    if (idx >= 0) {
+      if (currentOffset + idx >= offset) {
+        // 找到目标，滚动到该位置
+        const range = doc.createRange();
+        range.setStart(node, idx);
+        range.setEnd(node, Math.min(idx + word.length, text.length));
+        const rect = range.getBoundingClientRect();
+        if (rect.width > 0 || rect.height > 0) {
+          range.startContainer.parentElement?.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+          return true;
+        }
+      }
+      currentOffset += text.length;
+    }
+  }
+
+  // 兜底：尝试纯文本搜索（不使用 offset）
+  const fallbackWalker = doc.createTreeWalker(
+    doc.body,
+    NodeFilter.SHOW_TEXT,
+    null
+  );
+  let fallbackNode: Text | null = null;
+  while ((fallbackNode = fallbackWalker.nextNode() as Text | null)) {
+    const text = fallbackNode.textContent ?? "";
+    if (text.toLowerCase().includes(word.toLowerCase())) {
+      const range = doc.createRange();
+      const fbIdx = text.toLowerCase().indexOf(word.toLowerCase());
+      range.setStart(fallbackNode, fbIdx);
+      range.setEnd(fallbackNode, Math.min(fbIdx + word.length, text.length));
+      const rect = range.getBoundingClientRect();
+      if (rect.width > 0 || rect.height > 0) {
+        fallbackNode.parentElement?.scrollIntoView({ behavior: "smooth", block: "center" });
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * 捕获当前页面中选中单词的位置信息。
+ * 返回 { xpath, offset } 或 null（无可用选区）。
+ * @param savedRange 可选的预保存 Range（用于 Siphon 等场景，selection 可能已被 UI 操作清除）
+ */
+function captureWordPosition(savedRange?: Range | null): { xpath: string; offset: number } | null {
+  let range: Range | null = null;
+  let startContainer: Node | null = null;
+  let startOffset = 0;
+
+  if (savedRange) {
+    range = savedRange;
+    startContainer = range.startContainer;
+    startOffset = range.startOffset;
+  } else {
+    // 必须用 unsafeWindow.getSelection 获取页面真实选区，而非沙箱内的 selection
+    const pw = getPageWindowForEvents();
+    const selection = pw.getSelection();
+    if (!selection || selection.isCollapsed || selection.rangeCount === 0) return null;
+    range = selection.getRangeAt(0);
+    startContainer = range.startContainer;
+    startOffset = range.startOffset;
+  }
+
+  if (!startContainer || startContainer.nodeType !== Node.TEXT_NODE) return null;
+
+  const textNode = startContainer as Text;
+  const xpath = getXPathForTextNode(textNode);
+  return { xpath, offset: startOffset };
+}
+
+/**
+ * 跳转到指定词条的原始页面并滚动到单词位置。
+ */
+function navigateToEntryPosition(entry: DoubaoWordbookEntry) {
+  if (!entry.pageUrl) {
+    toast("该词条无原始页面地址");
+    return;
+  }
+
+  // 打开新标签页
+  const win = window.open(entry.pageUrl, "_blank");
+  if (!win) {
+    toast("无法打开新标签页，请检查浏览器弹窗设置");
+    return;
+  }
+
+  // 尝试在新页面中滚动到单词位置
+  // 由于跨域限制，仅在同源时可操作；否则只打开页面
+  if (entry.wordXPath && typeof entry.wordTextOffset === "number") {
+    win.addEventListener("load", () => {
+      try {
+        // 尝试访问 win.document，用于同源页面
+        void win.document; // 触发同源检查
+        const success = scrollToWordPosition(entry.单词, entry.wordTextOffset!, win.document);
+        if (!success) {
+          // 尝试纯文本搜索
+          scrollToWordPosition(entry.单词, 0, win.document);
+        }
+      } catch {
+        // 跨域时无法操作新页面 DOM，仅已打开为准
+      }
+    }, { once: true });
+  }
 }
 
 function main() {

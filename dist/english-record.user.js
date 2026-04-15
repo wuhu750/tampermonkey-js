@@ -612,7 +612,7 @@ ${olLines.join("\n")}` : olLines.join("\n");
       table.style.cssText = ui.table;
       const thead = document.createElement("thead");
       const hr = document.createElement("tr");
-      const heads = ["#", "\u6765\u6E90", "\u5355\u8BCD", "\u53D1\u97F3", "\u7FFB\u8BD1", "\u89E3\u91CA", "\u8BCD\u6027", "\u97F3\u6807", "\u5E38\u89C1\u642D\u914D", "\u4F8B\u53E5", "\u4FDD\u5B58\u65F6\u95F4"];
+      const heads = ["#", "\u6765\u6E90", "\u5355\u8BCD", "\u53D1\u97F3", "\u7FFB\u8BD1", "\u89E3\u91CA", "\u8BCD\u6027", "\u97F3\u6807", "\u5E38\u89C1\u642D\u914D", "\u4F8B\u53E5", "\u4FDD\u5B58\u65F6\u95F4", "\u64CD\u4F5C"];
       for (const h of heads) {
         const th = document.createElement("th");
         th.scope = "col";
@@ -651,7 +651,9 @@ ${olLines.join("\n")}` : olLines.join("\n");
           e.\u97F3\u6807,
           e.\u5E38\u89C1\u642D\u914D,
           e.\u4F8B\u53E5,
-          formatSavedAtLocal(e.savedAt)
+          formatSavedAtLocal(e.savedAt),
+          ""
+          // 操作列占位
         ];
         cells.forEach((raw, colIdx) => {
           const td = document.createElement("td");
@@ -672,6 +674,20 @@ ${olLines.join("\n")}` : olLines.join("\n");
               td.appendChild(sub);
             } else {
               td.textContent = "\u2014";
+            }
+            tr.appendChild(td);
+            return;
+          }
+          if (colIdx === 11) {
+            td.style.cssText = `padding:8px 10px;border:1px solid ${pal.cellBorder};vertical-align:top;`;
+            if (e.pageUrl) {
+              const btn = document.createElement("button");
+              btn.type = "button";
+              btn.textContent = "\u8DF3\u8F6C";
+              btn.style.cssText = `cursor:pointer;padding:4px 8px;border-radius:6px;border:1px solid ${ui.dark ? "#4b5563" : "#d1d5db"};background:${ui.dark ? "#1f2937" : "#f9fafb"};color:${ui.dark ? "#e5e7eb" : "#111827"};font:inherit;`;
+              btn.title = e.wordXPath ? "\u8DF3\u8F6C\u5230\u539F\u6587\u5E76\u6EDA\u52A8\u5230\u5355\u8BCD\u4F4D\u7F6E" : "\u8DF3\u8F6C\u5230\u539F\u6587\u9875\u9762";
+              btn.addEventListener("click", () => navigateToEntryPosition(e));
+              td.appendChild(btn);
             }
             tr.appendChild(td);
             return;
@@ -919,13 +935,15 @@ ${olLines.join("\n")}` : olLines.join("\n");
     const wordHint = extractWordFromPanel(done);
     const fields = parseDoubaoTranslation(done, wordHint);
     const store = loadStore();
+    const pos = captureWordPosition();
     const entry = {
       id: randomId(),
       savedAt: (/* @__PURE__ */ new Date()).toISOString(),
       pageUrl: location.href,
       pageTitle: document.title,
       source: "doubao",
-      ...fields
+      ...fields,
+      ...pos && { wordXPath: pos.xpath, wordTextOffset: pos.offset }
     };
     store.entries.unshift(entry);
     saveStore(store);
@@ -982,7 +1000,7 @@ ${olLines.join("\n")}` : olLines.join("\n");
   function siphonEntryContentFingerprint(fields) {
     return `${normalizeWordKey(fields.\u5355\u8BCD)}|${fields.\u8BCD\u6027.trim().slice(0, 200)}|${fields.\u89E3\u91CA.trim().slice(0, 500)}`;
   }
-  function saveSiphonEntryCore(fields, toastMsg, silentOnDup) {
+  function saveSiphonEntryCore(fields, toastMsg, silentOnDup, position) {
     const store = loadStore();
     const entry = {
       id: randomId(),
@@ -990,7 +1008,8 @@ ${olLines.join("\n")}` : olLines.join("\n");
       pageUrl: location.href,
       pageTitle: document.title,
       source: "siphon",
-      ...fields
+      ...fields,
+      ...position && { wordXPath: position.xpath, wordTextOffset: position.offset }
     };
     const fp = siphonEntryContentFingerprint(entry);
     if (store.entries.some((e) => e.source === "siphon" && siphonEntryContentFingerprint(e) === fp)) {
@@ -1002,7 +1021,7 @@ ${olLines.join("\n")}` : olLines.join("\n");
     updateBarCount();
     if (toastMsg) toast(toastMsg);
   }
-  function saveEntryFromSiphonSelection(word) {
+  function saveEntryFromSiphonSelection(word, savedRange) {
     const w = word.trim();
     if (!w) return;
     const parsed = parseSiphonExtensionPopover(document);
@@ -1030,10 +1049,16 @@ ${olLines.join("\n")}` : olLines.join("\n");
         \u4F8B\u53E5: ""
       };
     }
-    saveSiphonEntryCore(fields, `\u5DF2\u52A0\u5165\u751F\u8BCD\u672C\uFF08siphon\uFF09\uFF1A${fields.\u5355\u8BCD}`);
+    siphonLastManualSaveTime = Date.now();
+    const pos = captureWordPosition(savedRange);
+    saveSiphonEntryCore(fields, `\u5DF2\u52A0\u5165\u751F\u8BCD\u672C\uFF08siphon\uFF09\uFF1A${fields.\u5355\u8BCD}`, false, pos);
   }
   var siphonPopoverObserveTimer = 0;
+  var siphonLastManualSaveTime = 0;
   function tryAutoCaptureSiphonPopover() {
+    if (Date.now() - siphonLastManualSaveTime < 2e3) {
+      return;
+    }
     const parsed = parseSiphonExtensionPopover(document);
     if (!parsed || !parsed.\u89E3\u91CA.trim()) return;
     saveSiphonEntryCore(parsed, `\u5DF2\u4ECE Siphon \u540C\u6B65\uFF1A${parsed.\u5355\u8BCD}`, true);
@@ -1385,7 +1410,7 @@ ${olLines.join("\n")}` : olLines.join("\n");
       hideSiphonSelectionToolbar();
       siphonPendingRange = null;
       if (text) {
-        saveEntryFromSiphonSelection(text);
+        saveEntryFromSiphonSelection(text, saved);
       }
       try {
         applyRangeToPageSelection(saved, "button-click");
@@ -1565,6 +1590,129 @@ ${olLines.join("\n")}` : olLines.join("\n");
         siphonPendingRange = null;
       }
     });
+  }
+  function getXPathForTextNode(textNode) {
+    const parts = [];
+    let current = textNode;
+    while (current && current.nodeType === Node.TEXT_NODE) {
+      const parent = current.parentElement;
+      if (!parent) break;
+      const siblings = Array.from(parent.childNodes).filter(
+        (n) => n.nodeType === Node.TEXT_NODE || n.nodeType === Node.ELEMENT_NODE
+      );
+      const index = siblings.indexOf(current) + 1;
+      const tag = parent.tagName.toLowerCase();
+      parts.unshift(`${tag}[${index}]`);
+      current = parent;
+    }
+    if (current && current.nodeType === Node.ELEMENT_NODE) {
+      const elem = current;
+      const siblings = Array.from(elem.childNodes).filter((n) => n.nodeType === Node.TEXT_NODE);
+      const idx = siblings.indexOf(textNode) + 1;
+      parts.push(`text()[${idx}]`);
+    }
+    return "/" + parts.join("/");
+  }
+  function scrollToWordPosition(word, offset, doc = document) {
+    if (!word || !doc.body) return false;
+    const iterator = doc.createTreeWalker(
+      doc.body,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode: (node2) => {
+          const text = node2.textContent ?? "";
+          const idx = text.toLowerCase().indexOf(word.toLowerCase());
+          return idx >= 0 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+        }
+      }
+    );
+    let node = null;
+    let currentOffset = 0;
+    while (node = iterator.nextNode()) {
+      const text = node.textContent ?? "";
+      const idx = text.toLowerCase().indexOf(word.toLowerCase());
+      if (idx >= 0) {
+        if (currentOffset + idx >= offset) {
+          const range = doc.createRange();
+          range.setStart(node, idx);
+          range.setEnd(node, Math.min(idx + word.length, text.length));
+          const rect = range.getBoundingClientRect();
+          if (rect.width > 0 || rect.height > 0) {
+            range.startContainer.parentElement?.scrollIntoView({
+              behavior: "smooth",
+              block: "center"
+            });
+            return true;
+          }
+        }
+        currentOffset += text.length;
+      }
+    }
+    const fallbackWalker = doc.createTreeWalker(
+      doc.body,
+      NodeFilter.SHOW_TEXT,
+      null
+    );
+    let fallbackNode = null;
+    while (fallbackNode = fallbackWalker.nextNode()) {
+      const text = fallbackNode.textContent ?? "";
+      if (text.toLowerCase().includes(word.toLowerCase())) {
+        const range = doc.createRange();
+        const fbIdx = text.toLowerCase().indexOf(word.toLowerCase());
+        range.setStart(fallbackNode, fbIdx);
+        range.setEnd(fallbackNode, Math.min(fbIdx + word.length, text.length));
+        const rect = range.getBoundingClientRect();
+        if (rect.width > 0 || rect.height > 0) {
+          fallbackNode.parentElement?.scrollIntoView({ behavior: "smooth", block: "center" });
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+  function captureWordPosition(savedRange) {
+    let range = null;
+    let startContainer = null;
+    let startOffset = 0;
+    if (savedRange) {
+      range = savedRange;
+      startContainer = range.startContainer;
+      startOffset = range.startOffset;
+    } else {
+      const pw = getPageWindowForEvents();
+      const selection = pw.getSelection();
+      if (!selection || selection.isCollapsed || selection.rangeCount === 0) return null;
+      range = selection.getRangeAt(0);
+      startContainer = range.startContainer;
+      startOffset = range.startOffset;
+    }
+    if (!startContainer || startContainer.nodeType !== Node.TEXT_NODE) return null;
+    const textNode = startContainer;
+    const xpath = getXPathForTextNode(textNode);
+    return { xpath, offset: startOffset };
+  }
+  function navigateToEntryPosition(entry) {
+    if (!entry.pageUrl) {
+      toast("\u8BE5\u8BCD\u6761\u65E0\u539F\u59CB\u9875\u9762\u5730\u5740");
+      return;
+    }
+    const win = window.open(entry.pageUrl, "_blank");
+    if (!win) {
+      toast("\u65E0\u6CD5\u6253\u5F00\u65B0\u6807\u7B7E\u9875\uFF0C\u8BF7\u68C0\u67E5\u6D4F\u89C8\u5668\u5F39\u7A97\u8BBE\u7F6E");
+      return;
+    }
+    if (entry.wordXPath && typeof entry.wordTextOffset === "number") {
+      win.addEventListener("load", () => {
+        try {
+          void win.document;
+          const success = scrollToWordPosition(entry.\u5355\u8BCD, entry.wordTextOffset, win.document);
+          if (!success) {
+            scrollToWordPosition(entry.\u5355\u8BCD, 0, win.document);
+          }
+        } catch {
+        }
+      }, { once: true });
+    }
   }
   function main() {
     const plugins = [
