@@ -1352,7 +1352,6 @@ function initSiphonExtensionRootObserver() {
       try {
         tryAutoCaptureSiphonPopover();
       } catch (e) {
-        console.warn("[tmjs-doubao-wordbook] siphon popover capture", e);
       }
     }, 450);
   });
@@ -1374,7 +1373,6 @@ function ensureMutationObserverOnRoot(root: Document | ShadowRoot) {
       try {
         injectAddButtons();
       } catch (e) {
-        console.warn("[tmjs-doubao-wordbook]", e);
       }
     });
   });
@@ -1420,11 +1418,6 @@ const SIPHON_SELECTION_TOOLBAR_ID = "tmjs-selection-siphon-toolbar";
 
 /** 控制台过滤 `[tmjs-siphon]` 可只看本段日志 */
 function siphonLog(msg: string, extra?: unknown): void {
-  if (extra !== undefined) {
-    console.log("[tmjs-siphon]", msg, extra);
-  } else {
-    console.log("[tmjs-siphon]", msg);
-  }
 }
 
 let siphonPendingRange: Range | null = null;
@@ -1772,7 +1765,6 @@ function showSiphonSelectionToolbar(rect: DOMRect) {
       }
       siphonLog("按钮点击: 流程结束（异步 reapply 仍会打日志）");
     } catch (err) {
-      console.warn("[tmjs-doubao-wordbook] siphon toolbar", err);
       siphonLog("按钮点击: catch", err);
     }
   });
@@ -2160,7 +2152,6 @@ function main() {
             syncFloatingBarCollapsedFromStorage();
             syncFloatingBarThemeFromStorage();
           } catch (e) {
-            console.warn("[tmjs-doubao-wordbook]", e);
           }
         };
         run();
@@ -2183,7 +2174,6 @@ function main() {
     try {
       p.init();
     } catch (e) {
-      console.warn(`[tmjs-doubao-wordbook] plugin init failed: ${p.id}`, e);
     }
   }
 }

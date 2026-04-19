@@ -21,7 +21,6 @@ function main() {
     modals.forEach((modal) => modal.remove());
     document.body.style.overflow = "";
     document.documentElement.removeAttribute("style");
-    console.log(`[zhihu-hide-login-modal] removed ${modals.length} modal(s)`);
   };
 
   removeLoginModal();
@@ -35,7 +34,6 @@ function main() {
     subtree: true,
   });
 
-  console.log("[zhihu-hide-login-modal] running");
 }
 
 main();

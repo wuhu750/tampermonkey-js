@@ -1070,7 +1070,6 @@ ${olLines.join("\n")}` : olLines.join("\n");
         try {
           tryAutoCaptureSiphonPopover();
         } catch (e) {
-          console.warn("[tmjs-doubao-wordbook] siphon popover capture", e);
         }
       }, 450);
     });
@@ -1087,7 +1086,6 @@ ${olLines.join("\n")}` : olLines.join("\n");
         try {
           injectAddButtons();
         } catch (e) {
-          console.warn("[tmjs-doubao-wordbook]", e);
         }
       });
     });
@@ -1124,11 +1122,6 @@ ${olLines.join("\n")}` : olLines.join("\n");
   }
   var SIPHON_SELECTION_TOOLBAR_ID = "tmjs-selection-siphon-toolbar";
   function siphonLog(msg, extra) {
-    if (extra !== void 0) {
-      console.log("[tmjs-siphon]", msg, extra);
-    } else {
-      console.log("[tmjs-siphon]", msg);
-    }
   }
   var siphonPendingRange = null;
   var siphonToolbarShownAt = 0;
@@ -1430,7 +1423,6 @@ ${olLines.join("\n")}` : olLines.join("\n");
         }
         siphonLog("\u6309\u94AE\u70B9\u51FB: \u6D41\u7A0B\u7ED3\u675F\uFF08\u5F02\u6B65 reapply \u4ECD\u4F1A\u6253\u65E5\u5FD7\uFF09");
       } catch (err) {
-        console.warn("[tmjs-doubao-wordbook] siphon toolbar", err);
         siphonLog("\u6309\u94AE\u70B9\u51FB: catch", err);
       }
     });
@@ -1728,7 +1720,6 @@ ${olLines.join("\n")}` : olLines.join("\n");
               syncFloatingBarCollapsedFromStorage();
               syncFloatingBarThemeFromStorage();
             } catch (e) {
-              console.warn("[tmjs-doubao-wordbook]", e);
             }
           };
           run();
@@ -1750,7 +1741,6 @@ ${olLines.join("\n")}` : olLines.join("\n");
       try {
         p.init();
       } catch (e) {
-        console.warn(`[tmjs-doubao-wordbook] plugin init failed: ${p.id}`, e);
       }
     }
   }
