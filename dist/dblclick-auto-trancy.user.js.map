@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../src/userscripts/dblclick-auto-trancy.user.ts"],
+  "sourcesContent": ["// ==UserScript==\n// @name         dblclick-auto-trancy\n// @namespace    https://example.local/tmjs\n// @version      0.1.0\n// @description  Detect double-click on page and output to console\n// @match        *://*/*\n// @run-at       document-end\n// @grant        none\n// ==/UserScript==\n\nexport {};\n\nfunction main() {\n  document.addEventListener('dblclick', () => {\n    setTimeout(() => {\n      const btn = document.getElementById('trancy-button');\n      if (btn) {\n        const shadowRoot = btn?.querySelector('div')?.shadowRoot;\n        if (shadowRoot) {\n          const translatorBtn = shadowRoot.querySelector('.rd-translator-btn') as HTMLElement;\n          if (translatorBtn) {\n            translatorBtn.click();\n          }\n        }\n      }\n    }, 1000);\n  });\n}\n\nmain();"],
+  "mappings": ";;;;;;;;;;;;;AAYA,WAAS,OAAO;AACd,aAAS,iBAAiB,YAAY,MAAM;AAC1C,iBAAW,MAAM;AACf,cAAM,MAAM,SAAS,eAAe,eAAe;AACnD,YAAI,KAAK;AACP,gBAAM,aAAa,KAAK,cAAc,KAAK,GAAG;AAC9C,cAAI,YAAY;AACd,kBAAM,gBAAgB,WAAW,cAAc,oBAAoB;AACnE,gBAAI,eAAe;AACjB,4BAAc,MAAM;AAAA,YACtB;AAAA,UACF;AAAA,QACF;AAAA,MACF,GAAG,GAAI;AAAA,IACT,CAAC;AAAA,EACH;AAEA,OAAK;",
+  "names": []
+}
