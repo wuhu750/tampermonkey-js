@@ -21,6 +21,12 @@
             const translatorBtn = shadowRoot.querySelector(".rd-translator-btn");
             if (translatorBtn) {
               translatorBtn.click();
+              setTimeout(() => {
+                const controlCenter = document.querySelector("xt-card");
+                const cardShadowRoot = controlCenter?.querySelector("div")?.shadowRoot;
+                const voiceBtn = cardShadowRoot?.querySelector(".icon-voice");
+                voiceBtn?.click();
+              }, 1e3);
             }
           }
         }
