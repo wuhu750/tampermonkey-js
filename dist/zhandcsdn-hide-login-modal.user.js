@@ -12,7 +12,7 @@
 
 "use strict";
 (() => {
-  // src/userscripts/zhihu-hide-login-modal.user.ts
+  // src/userscripts/zhandcsdn-hide-login-modal.user.ts
   function zhihu() {
     const MODAL_SELECTOR = "div.Modal-wrapper.Modal-enter-done, div.Modal-wrapper.undefined.Modal-enter-done";
     const removeLoginModal = () => {
