@@ -65,5 +65,26 @@ function zhihuPostContent() {
   });
 }
 
+// 隐藏右下角"登录即可查看"小弹窗（类名为打包工具随机生成，按文本内容+固定定位匹配）
+function zhihuLoginPrompt() {
+  const hidePrompt = () => {
+    document.querySelectorAll("div").forEach((el) => {
+      if (el.style.display === "none") return;
+      if (!el.textContent?.includes("登录即可查看")) return;
+      if (window.getComputedStyle(el).position !== "fixed") return;
+      el.style.display = "none";
+    });
+  };
+
+  hidePrompt();
+
+  const observer = new MutationObserver(hidePrompt);
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+  });
+}
+
 zhihuPostContent();
 zhihuModal();
+zhihuLoginPrompt();

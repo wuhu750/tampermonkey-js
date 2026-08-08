@@ -54,6 +54,23 @@
       subtree: true
     });
   }
+  function zhihuLoginPrompt() {
+    const hidePrompt = () => {
+      document.querySelectorAll("div").forEach((el) => {
+        if (el.style.display === "none") return;
+        if (!el.textContent?.includes("\u767B\u5F55\u5373\u53EF\u67E5\u770B")) return;
+        if (window.getComputedStyle(el).position !== "fixed") return;
+        el.style.display = "none";
+      });
+    };
+    hidePrompt();
+    const observer = new MutationObserver(hidePrompt);
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  }
   zhihuPostContent();
   zhihuModal();
+  zhihuLoginPrompt();
 })();
