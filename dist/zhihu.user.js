@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         zhihu-hide-login-modal
+// @name         zhihu-custom
 // @namespace    https://example.local/tmjs
 // @version      0.1.0
 // @description  在知乎页面自动移除未登录弹出的登录弹窗，用于避免阅读被频繁打断
@@ -12,8 +12,8 @@
 
 "use strict";
 (() => {
-  // src/userscripts/zhandcsdn-hide-login-modal.user.ts
-  function zhihu() {
+  // src/userscripts/zhihu.user.ts
+  function zhihuModal() {
     const MODAL_SELECTOR = "div.Modal-wrapper.Modal-enter-done, div.Modal-wrapper.undefined.Modal-enter-done";
     const removeLoginModal = () => {
       const modals = document.querySelectorAll(MODAL_SELECTOR);
@@ -31,24 +31,29 @@
       subtree: true
     });
   }
-  function csdn() {
-    const MODAL_SELECTOR = "div.passport-login-container";
-    const removeLoginModal = () => {
-      const modals = document.querySelectorAll(MODAL_SELECTOR);
-      if (modals.length === 0) return;
-      modals.forEach((modal) => modal.remove());
-      document.body.style.overflow = "";
-      document.documentElement.removeAttribute("style");
-    };
-    removeLoginModal();
-    const observer = new MutationObserver(() => {
-      removeLoginModal();
+  function zhihuPostContent() {
+    const postContentSelector = "div.Post-content";
+    const postContent = document.querySelector(postContentSelector);
+    if (!postContent) return;
+    const postContentSubElement = postContent.children[2];
+    if (!postContentSubElement) return;
+    postContentSubElement.style.width = "100%";
+    const postContentSubChild = postContentSubElement.firstElementChild;
+    if (postContentSubChild) {
+      postContentSubChild.style.width = "100%";
+      postContentSubChild.querySelectorAll("img[width]").forEach((img) => {
+        img.style.width = "auto";
+      });
+    }
+    postContent.style.width = "100%";
+    const observerContent = new MutationObserver(() => {
+      postContent.style.width = "100%";
     });
-    observer.observe(document.documentElement, {
+    observerContent.observe(postContent, {
       childList: true,
       subtree: true
     });
   }
-  zhihu();
-  csdn();
+  zhihuPostContent();
+  zhihuModal();
 })();
